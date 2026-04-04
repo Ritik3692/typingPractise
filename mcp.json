@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "shadcn": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "shadcn@latest",
+        "mcp"
+      ]
+    },
+    "mui": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@mui/mcp@latest"
+      ]
+    },
+    "nextjs": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@nextjs/mcp@latest"
+      ]
+    }
+  }
+}
