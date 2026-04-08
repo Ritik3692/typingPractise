@@ -6,6 +6,8 @@ import { Settings, Theme, TestMode, Difficulty } from '@/types';
 interface SettingsContextType {
   settings: Settings;
   updateSettings: (newSettings: Partial<Settings>) => void;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: (isOpen: boolean) => void;
   setMode: (mode: TestMode) => void;
   setModeValue: (value: number) => void;
   setDifficulty: (difficulty: Difficulty) => void;
@@ -18,7 +20,7 @@ interface SettingsContextType {
 const defaultSettings: Settings = {
   theme: 'default',
   mode: 'time',
-  modeValue: 30,
+  modeValue: 15,
   difficulty: 'normal',
   stopOnError: 'off',
   showLiveWpm: true,
@@ -30,6 +32,7 @@ const SettingsContext = createContext<SettingsContextType | undefined>(undefined
 
 export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [settings, setSettings] = useState<Settings>(defaultSettings);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
 
   // Load from localStorage
@@ -66,6 +69,8 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       value={{
         settings,
         updateSettings,
+        isSettingsOpen,
+        setIsSettingsOpen,
         setMode,
         setModeValue,
         setDifficulty,

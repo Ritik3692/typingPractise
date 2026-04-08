@@ -14,9 +14,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Monkeytype Clone",
-  description: "A premium typing practice application built with Next.js",
+  title: "raktype | Premium Typing Practice",
+  description: "A professional, high-performance typing practice application.",
 };
+
+import { Providers } from "@/components/Providers";
+import Header from "@/components/Header";
 
 export default function RootLayout({
   children,
@@ -33,9 +36,18 @@ export default function RootLayout({
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       cz-shortcut-listen="true"
       >
-        <SettingsProvider>
-          {children}
-        </SettingsProvider>
+        <Providers>
+          <div className="relative min-h-screen max-w-7xl mx-auto flex flex-col">
+            {/* Floating Header */}
+            <div className="absolute top-0 left-0 w-full z-50">
+              <Header  />
+            </div>
+            
+            <main className="flex-1 flex flex-col items-center justify-center p-4">
+              {children}
+            </main>
+          </div>
+        </Providers>
       </body>
     </html>
   );

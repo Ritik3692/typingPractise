@@ -17,6 +17,8 @@ export interface TestStats {
   missedChars: number;
   totalChars: number;
   timeElapsed: number;
+  wpmHistory: { time: number; wpm: number }[];
+  consistency: number;
 }
 
 export type Theme = 'default';

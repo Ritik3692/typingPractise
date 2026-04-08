@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { calculateWPM, calculateAccuracy } from '@/utils/calculations';
 
 export const useTypingMetrics = (correctTyped: number, totalTyped: number, timeSeconds: number, isActive: boolean) => {
   const [wpm, setWpm] = useState(0);
@@ -6,12 +7,10 @@ export const useTypingMetrics = (correctTyped: number, totalTyped: number, timeS
 
   useEffect(() => {
     if (isActive && timeSeconds > 0) {
-      // Calculate WPM = (typed characters / 5) / (seconds / 60)
-      const currentWpm = Math.round((correctTyped / 5) / (timeSeconds / 60));
+      const currentWpm = calculateWPM(correctTyped, timeSeconds);
       setWpm(currentWpm);
 
-      // Accuracy = (correct keys / total keys typed) * 100
-      const currentAcc = totalTyped > 0 ? Math.round((correctTyped / totalTyped) * 100) : 0;
+      const currentAcc = calculateAccuracy(correctTyped, totalTyped);
       setAccuracy(currentAcc);
     }
   }, [correctTyped, totalTyped, timeSeconds, isActive]);
