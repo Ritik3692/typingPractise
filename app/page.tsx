@@ -19,7 +19,7 @@ export default function Home() {
   };
 
   return (
-    <div className="w-full flex flex-col items-center justify-center animate-in fade-in duration-1000">
+    <div className="w-full flex flex-col items-center justify-center overflow-hidden animate-in fade-in duration-1000">
       {/* Main Content */}
       <div className="w-full flex items-center justify-center">
         {testStats ? (

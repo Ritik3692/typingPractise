@@ -107,33 +107,74 @@ const TypingTest: React.FC<TypingTestProps> = ({ onComplete }) => {
     initTest();
   }, [initTest]);
 
-  // Handle key presses
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (isTestOver) return;
-    
-    const { key } = e;
-    
-    // Start test on first key (excluding some function keys)
-    if (!hasStarted && key.length === 1) {
+  const startTestIfNeeded = useCallback(() => {
+    if (!hasStarted) {
       setHasStarted(true);
       startTimeRef.current = performance.now();
       if (settings.mode === 'time') startTimer();
     }
+  }, [hasStarted, settings.mode, startTimer]);
 
-    if (key === 'Backspace') {
-      if (currentIndex > 0) {
-        setCurrentIndex(prev => prev - 1);
-        setChars(prev => {
-          const next = [...prev];
-          if (next[currentIndex - 1].status === 'correct') {
-            setCorrectTyped(c => Math.max(0, c - 1));
-          }
-          next[currentIndex - 1].status = 'pending';
-          return next;
-        });
-      }
-      return;
+  const clearHiddenInput = useCallback(() => {
+    if (inputRef.current) inputRef.current.value = '';
+  }, []);
+
+  const handleBackspace = useCallback(() => {
+    if (currentIndex > 0) {
+      setCurrentIndex(prev => prev - 1);
+      setChars(prev => {
+        const next = [...prev];
+        if (next[currentIndex - 1].status === 'correct') {
+          setCorrectTyped(c => Math.max(0, c - 1));
+        }
+        next[currentIndex - 1].status = 'pending';
+        return next;
+      });
     }
+    clearHiddenInput();
+  }, [clearHiddenInput, currentIndex]);
+
+  const processTypedChar = useCallback((typedChar: string) => {
+    if (currentIndex >= chars.length) return;
+
+    const expectedChar = chars[currentIndex].char;
+
+    // Word transition should happen only on actual spaces.
+    // If expected char is a space, ignore any non-space input.
+    if (expectedChar === ' ' && typedChar !== ' ') return;
+
+    // Also ignore accidental spaces inside words.
+    if (typedChar === ' ' && expectedChar !== ' ') return;
+
+    setTotalTyped(prev => prev + 1);
+
+    setChars(prev => {
+      const next = [...prev];
+      const isMatch = typedChar === expectedChar;
+      if (isMatch) {
+        next[currentIndex].status = 'correct';
+        setCorrectTyped(c => c + 1);
+      } else {
+        next[currentIndex].status = 'incorrect';
+      }
+      return next;
+    });
+
+    // Handle words mode ending
+    if (settings.mode === 'words' && currentIndex === chars.length - 1) {
+      endTimeRef.current = performance.now();
+      setIsTestOver(true);
+    } else {
+      setCurrentIndex(prev => prev + 1);
+    }
+    clearHiddenInput();
+  }, [chars, clearHiddenInput, currentIndex, settings.mode]);
+
+  // Handle key presses (desktop + hardware keyboards)
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (isTestOver) return;
+
+    const { key } = e;
 
     if (key === 'Enter' || key === 'Tab') {
       e.preventDefault();
@@ -141,34 +182,42 @@ const TypingTest: React.FC<TypingTestProps> = ({ onComplete }) => {
       return;
     }
 
-    // Ignore other special keys
-    if (key.length !== 1) return;
-
-    // Handle normal character
-    if (currentIndex < chars.length) {
-      const expectedChar = chars[currentIndex].char;
-      setTotalTyped(prev => prev + 1);
-      
-      setChars(prev => {
-        const next = [...prev];
-        const isMatch = key === expectedChar;
-        if (isMatch) {
-          next[currentIndex].status = 'correct';
-          setCorrectTyped(c => c + 1);
-        } else {
-          next[currentIndex].status = 'incorrect';
-        }
-        return next;
-      });
-
-      // Handle words mode ending
-      if (settings.mode === 'words' && currentIndex === chars.length - 1) {
-        endTimeRef.current = performance.now();
-        setIsTestOver(true);
-      } else {
-        setCurrentIndex(prev => prev + 1);
-      }
+    // Handle desktop/hardware keyboards here and prevent default
+    // so beforeinput does not double-process the same key.
+    if (key === 'Backspace' || key === 'Delete') {
+      e.preventDefault();
+      handleBackspace();
+      return;
     }
+
+    if (key.length === 1) {
+      e.preventDefault();
+      startTestIfNeeded();
+      processTypedChar(key);
+      return;
+    }
+  };
+
+  // Handle virtual keyboard input (mobile)
+  const handleBeforeInput = (e: React.FormEvent<HTMLInputElement>) => {
+    if (isTestOver) return;
+
+    const inputEvent = e.nativeEvent as InputEvent;
+
+    if (inputEvent.inputType?.startsWith('delete')) {
+      handleBackspace();
+      e.preventDefault();
+      return;
+    }
+
+    const typed = inputEvent.data;
+    if (!typed) return;
+
+    startTestIfNeeded();
+    for (const char of typed) {
+      processTypedChar(char);
+    }
+    e.preventDefault();
   };
 
   // Ensure timer end also sets endTime
@@ -206,31 +255,71 @@ const TypingTest: React.FC<TypingTestProps> = ({ onComplete }) => {
     }
   }, [isTestOver, onComplete, totalTyped, chars, currentIndex, getElapsedSeconds, history]);
 
-  // Update caret position
-  useEffect(() => {
+  const updateCaretPosition = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
     const charElem = document.getElementById('current-char');
-    if (charElem && containerRef.current) {
+    if (charElem) {
       const rect = charElem.getBoundingClientRect();
-      const parentRect = containerRef.current.getBoundingClientRect();
+      const parentRect = container.getBoundingClientRect();
       setCaretPos({
-        top: rect.top - parentRect.top,
-        left: rect.left - parentRect.left,
+        top: rect.top - parentRect.top + container.scrollTop,
+        left: rect.left - parentRect.left + container.scrollLeft,
       });
       setCaretHeight(rect.height * 1.02);
-    } else if (currentIndex === 0 && containerRef.current) {
+    } else if (currentIndex === 0) {
       // Handle initial position
-      const firstChar = containerRef.current.querySelector('.char');
+      const firstChar = container.querySelector('.char');
       if (firstChar) {
         const rect = firstChar.getBoundingClientRect();
-        const parentRect = containerRef.current.getBoundingClientRect();
+        const parentRect = container.getBoundingClientRect();
         setCaretPos({
-          top: rect.top - parentRect.top,
-          left: rect.left - parentRect.left,
+          top: rect.top - parentRect.top + container.scrollTop,
+          left: rect.left - parentRect.left + container.scrollLeft,
         });
         setCaretHeight(rect.height * 1.02);
       }
     }
-  }, [currentIndex, words]);
+  }, [currentIndex]);
+
+  // Update caret position
+  useEffect(() => {
+    updateCaretPosition();
+  }, [updateCaretPosition, currentIndex, words]);
+
+  // Keep caret synced while typing box scrolls/sizes.
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const handleSync = () => updateCaretPosition();
+    container.addEventListener('scroll', handleSync, { passive: true });
+    window.addEventListener('resize', handleSync);
+
+    return () => {
+      container.removeEventListener('scroll', handleSync);
+      window.removeEventListener('resize', handleSync);
+    };
+  }, [updateCaretPosition]);
+
+  // Keep current character visible in the box without force-centering each key.
+  useEffect(() => {
+    const container = containerRef.current;
+    const charElem = document.getElementById('current-char');
+    if (!container || !charElem) return;
+
+    const containerRect = container.getBoundingClientRect();
+    const charRect = charElem.getBoundingClientRect();
+    const topPadding = 24;
+    const bottomPadding = 40;
+
+    if (charRect.bottom > containerRect.bottom - bottomPadding) {
+      container.scrollTop += charRect.bottom - (containerRect.bottom - bottomPadding);
+    } else if (charRect.top < containerRect.top + topPadding) {
+      container.scrollTop -= (containerRect.top + topPadding) - charRect.top;
+    }
+  }, [currentIndex, hasStarted]);
 
   const handleContainerClick = () => {
     inputRef.current?.focus();
@@ -282,13 +371,14 @@ const TypingTest: React.FC<TypingTestProps> = ({ onComplete }) => {
       <div 
         ref={containerRef}
         onClick={handleContainerClick}
-        className={`relative w-full min-h-[160px] transition-all duration-300 ${!hasStarted && !isTestOver ? 'cursor-text' : ''}`}
+        className={`relative flex h-[340px] w-full items-start overflow-y-auto overflow-x-hidden rounded-2xl border border-sub/10 bg-sub/5 px-4 py-5 transition-all duration-300 custom-scrollbar ${!hasStarted && !isTestOver ? 'cursor-text' : ''}`}
       >
         <input
           ref={inputRef}
           type="text"
           className="hidden-input"
           onKeyDown={handleKeyDown}
+          onBeforeInput={handleBeforeInput}
           autoFocus
           autoComplete="off"
           autoCapitalize="off"

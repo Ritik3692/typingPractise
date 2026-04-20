@@ -12,7 +12,7 @@ import {
   Divider,
   Stack
 } from '@mui/material';
-import { Send, Settings, Palette } from 'lucide-react';
+import { Send, Palette } from 'lucide-react';
 import { Settings as MuiSettingsIcon } from '@mui/icons-material';
 
 export default function UITestPage() {
